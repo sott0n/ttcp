@@ -13,7 +13,9 @@
 #define ETHERNET_HANDLER_TABLE_SIZE 16
 
 struct ethernet_hdr {
+    // destination Mac address
     ethernet_addr_t dst;
+    // Source Mac address
     ethernet_addr_t src;
     uint16_t type;
 } __attribute__((packed));
