@@ -31,7 +31,7 @@ static struct {
     int handler_num;
 } g_ethernet = {0};
 
-ethernet_addr_t * ethernet_get_addr(void) {
+ethernet_addr_t *ethernet_get_addr(void) {
     return &g_ethernet.addr;
 }
 
@@ -94,7 +94,7 @@ int ethernet_addr_pton(const char *p, ethernet_addr_t *n) {
     long val;
 
     if (!p || !n) {
-        goto ERROR;
+        return -1;
     }
     for (index = 0; index < ETHERNET_ADDR_LEN; index++) {
         val = strtol(p, &ep, 16);
@@ -110,7 +110,7 @@ int ethernet_addr_pton(const char *p, ethernet_addr_t *n) {
     return 0;
 }
 
-char * ethernet_addr_ntop(const ethernet_addr_t *n, char *p, size_t size) {
+char *ethernet_addr_ntop(const ethernet_addr_t *n, char *p, size_t size) {
     if (!n || !p || size < ETHERNET_ADDR_STR_LEN + 1) {
         return NULL;
     }

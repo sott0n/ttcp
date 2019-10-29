@@ -15,7 +15,7 @@
 #include <pthead.h>
 #include <errno.h>
 
-static void * device_reader_thread(void *arg);
+static void *device_reader_thread(void *arg);
 
 static struct {
     int fd;
@@ -99,7 +99,7 @@ void device_cleanup(void) {
     g_device.handler = NULL;
 }
 
-static void * device_reader_thread(void *arg) {
+static void *device_reader_thread(void *arg) {
     ssize_t len = 0, bpf_frame;
     /* bpf_hdr : bpf's header
         struct timeval bh_tstamp;   // timestamp
