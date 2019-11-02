@@ -33,7 +33,7 @@ int ip_add_handler(uint16_t type, __ip_handler_t handler) {
     return 0;
 }
 
-void ip_recv(uint8_t *buf; ssize_t len, int bcast) {
+void ip_recv(const uint8_t *buf; ssize_t len, int bcast) {
     fprintf(stderr, "ip_recv(): %ld (%s)\n", len, bcast ? "broadcast" : "unicast");
 }
 
