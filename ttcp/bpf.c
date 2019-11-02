@@ -143,19 +143,3 @@ ssize_t device_write(const uint8_t *buffer, size_t len) {
 ssize_t device_writev(const struct iovec *iov, int iovcnt) {
     return writev(g_device.fd, iov, iovcnt);
 }
-
-#ifdef _DEVICE_UNIT_TEST
-void dummy_function(uint8_t *buf, ssize_t len) {
-    printf("input: %ld\n", len);
-}
-
-int main(int argc, char *argv[]) {
-    if (device_init("en0", dummy_function) == -1) {
-        device_cleanup();
-        return -1;
-    }
-    sleep(10);
-    device_cleanup();
-    return 0;
-}
-#endif
