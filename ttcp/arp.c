@@ -35,7 +35,7 @@ static struct {
     } table[ARP_TABLE_SIZE];
     int num;
     int position;
-    gthread_rwlock_t rwlock;
+    pthread_rwlock_t rwlock;
 } g_arp = {{0}, 0, 0, PTHREAD_RWLOCK_INITIALIZER};
 
 static int arp_send_request(const ip_addr_t *tpa);
@@ -155,4 +155,17 @@ static int arp_send_reply(const ethernet_addr_t *tha, const ip_addr_t *tpa) {
         return -1;
     }
     return 0;
+}
+
+void arp_table_print(void) {
+    int offset;
+    char ha[ETHERNET_ADDR_STR_LEN + 1], pa[IP_ADDR_STR_LEN + 1];
+
+    pthread_rwlock_rdlock(&g_arp.rwlock);
+    for (offset = 0; offset < g_arp.num; offset++) {
+        ethernet_add_ntop(&g_arp.table[offset].ha, ha, sizeof(ha));
+        ip_addr_ntop(&g_arp.table[offset].pa, pa, sizeof(pa));
+        fprintf(stderr, "%s at %s\n", pa, ha);
+    }
+    pthread_rwlock_unlock(&g_arp.rwlock);
 }

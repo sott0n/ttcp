@@ -2,19 +2,6 @@
 #include "device.h"
 #include "arp.h"
 
-static void arp_table_print(void) {
-    int offset;
-    char ha[ETHERNET_ADDR_STR_LEN + 1], pa[IP_ADDR_STR_LEN + 1];
-
-    pthread_rwlock_rdlock(&g_arp.rwlock);
-    for (offset = 0; offset < g_arp.num; offset++) {
-        ethernet_add_ntop(&g_arp.table[offset].ha, ha, sizeof(ha));
-        ip_addr_ntop(&g_arp.table[offset].pa, pa, sizeof(pa));
-        fprintf(stderr, "%s at %s\n", pa, ha);
-    }
-    pthread_rwlock_unlock(&g_arp.rwlock);
-}
-
 int main(int argc, char *argv[]) {
     char device[] = "en0";
     char ethernet_addr[] = "58:55:ca:fb:64:9f";

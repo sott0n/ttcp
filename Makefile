@@ -10,7 +10,7 @@ TEST =	test/arp_test \
 		test/ethernet_test \
 		test/ip_test
 
-CFLAGS := $(CFLAGS) -g -W -Wall -Who-unused-parameter -I .
+CFLAGS := $(CFLAGS) -g -W -Wall -Wno-unused-parameter -I ./ttcp
 
 .SUFFIXES:
 .SUFFIXES: .c .o

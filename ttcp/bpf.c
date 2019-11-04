@@ -12,7 +12,7 @@
 #include <sys/ioctl.h>
 #include <net/bpf.h>
 #include <net/if.h>
-#include <pthead.h>
+#include <pthread.h>
 #include <errno.h>
 
 static void *device_reader_thread(void *arg);
@@ -29,7 +29,7 @@ static struct {
 int device_init(const char *device_name, __device_interrupt_handler_t handler) {
     int index, flag, err;
     char dev[16];
-    struct ifreq, ifr;
+    struct ifreq ifr;
 
     /* To open BPF, search a number that can ber open "/dev/bpf#" */
     for (index = 0; index < 4; index++) {
@@ -64,7 +64,7 @@ int device_init(const char *device_name, __device_interrupt_handler_t handler) {
     }
     /* Check wether BPF return or not */
     flag = 1;
-    if (ioctl(g_device.fd, BIOCSSEESENT. &flag) == -1) {
+    if (ioctl(g_device.fd, BIOCSSEESENT, &flag) == -1) {
         perror("ioctl [BIOCSSEESENT]");
         return -1;
     }
@@ -75,7 +75,7 @@ int device_init(const char *device_name, __device_interrupt_handler_t handler) {
         return -1;
     }
     g_device.handler = handler;
-    if ((err = ptheread_create(&g_device.thread, NULL, device_reader_thread. NULL)) != 0) {
+    if ((err = pthread_create(&g_device.thread, NULL, device_reader_thread, NULL)) != 0) {
         fprintf(stderr, "pthread_create: error.\n");
         return -1;
     }
