@@ -1,8 +1,9 @@
-#include "arp.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <signal.h>
+#include "arp.h"
 
 #define ARP_HRD_ETHERNET 0x0001
 #define ARP_OP_REQUEST  1
@@ -36,10 +37,14 @@ static struct {
     int num;
     int position;
     pthread_rwlock_t rwlock;
-} g_arp = {{0}, 0, 0, PTHREAD_RWLOCK_INITIALIZER};
+} g_arp;
 
 static int arp_send_request(const ip_addr_t *tpa);
-static int arp_send_reply(const ethernet_addr_t *tha, const ip_addr_t *tpa);
+static int arp_send_reply(const ethernet_addr_t *tha, const ip_addr_t *tpa, const ethernet_addr_t *dst);
+
+void arp_init(void) {
+    pthread_rwlock_init(&g_arp.rwlock, NULL);
+}
 
 int arp_table_lookup(const ip_addr_t *pa, ethernet_addr_t *ha) {
     int offset, count, ret;
@@ -62,6 +67,9 @@ int arp_table_lookup(const ip_addr_t *pa, ethernet_addr_t *ha) {
                     memcpy(ha, &g_arp.table[offset].ha, sizeof(ethernet_addr_t));
                     break;
                 }
+            }
+            if (offset < g_arp.num) {
+                break;
             }
         }
     }
@@ -94,19 +102,23 @@ static int arp_table_update(const ethernet_addr_t *ha, const ip_addr_t *pa) {
     }
 }
 
-void arp_recv(uint8_t *buf, ssize_t len, int bcast) {
+void arp_recv(uint8_t *packet, size_t plen, ethernet_addr_t *src, ethernet_addr_t *dst) {
     struct arp *arp;
 
-    if (len < sizeof(struct arp)) {
+    (void)dst;
+    if (plen < sizeof(struct arp)) {
         return;
     }
-    arp = (struct arp *)buf;
+    arp = (struct arp *)packet;
     if (ntohs(arp->hdr.hrd) != ARP_HRD_ETHERNET || ntohs(arp->hdr.pro) != ETHERNET_TYPE_IP) {
+        return;
+    }
+    if (!ip_addr_islink(&arp->spa)) {
         return;
     }
     if (ip_addr_isself(&arp->tpa)) {
         if (ntohs(arp->hdr.op) == ARP_OP_REQUEST) {
-            arp_send_reply(&arp->sha, &arp->spa);
+            arp_send_reply(&arp->sha, &arp->spa, src);
         }
         arp_table_update(&arp->sha, &arp->spa);
     } else if(arp->spa == arp->tpa) {
@@ -135,7 +147,7 @@ static int arp_send_request(const ip_addr_t *tpa) {
     return 0;
 }
 
-static int arp_send_reply(const ethernet_addr_t *tha, const ip_addr_t *tpa) {
+static int arp_send_reply(const ethernet_addr_t *tha, const ip_addr_t *tpa, const ethernet_addr_t *dst) {
     struct arp arp;
 
     if (!tha || !tpa) {
@@ -151,7 +163,7 @@ static int arp_send_reply(const ethernet_addr_t *tha, const ip_addr_t *tpa) {
     memcpy(&arp.spa, ip_get_addr(), IP_ADDR_LEN);
     memcpy(&arp.tha, tha, ETHERNET_ADDR_LEN);
     memcpy(&arp.tpa, tpa, IP_ADDR_LEN);
-    if (ethernet_send(ETHERNET_TYPE_ARP, (uint8_t *)&arp, sizeof(arp), tha) < 0) {
+    if (ethernet_send(ETHERNET_TYPE_ARP, (uint8_t *)&arp, sizeof(arp), dst) < 0) {
         return -1;
     }
     return 0;
@@ -168,4 +180,22 @@ void arp_table_print(void) {
         fprintf(stderr, "%s at %s\n", pa, ha);
     }
     pthread_rwlock_unlock(&g_arp.rwlock);
+}
+
+int arp_send_garp(void) {
+    struct arp arp;
+
+    arp.hdr.hrd = htons(ARP_HRD_ETHERNET);
+    arp.hdr.pro = htons(ETHERNET_TYPE_IP);
+    arp.hdr.hln = 6;
+    arp.hdr.pln = 4;
+    arp.hdr.op = htons(ARP_OP_REQUEST);
+    memcpy(&arp.sha, ethernet_get_addr(), ETHERNET_ADDR_LEN);
+    memcpy(&arp.spa, ip_get_addr(), IP_ADDR_LEN);
+    memcpy(&arp.tha, ethernet_get_addr(), ETHERNET_ADDR_LEN);
+    memcpy(&arp.tpa, ip_get_addr(), IP_ADDR_LEN);
+    if (ethernet_send(ETHERNET_TYPE_ARP, (uint8_t *)&arp, sizeof(arp), &ETHERNET_ADDR_BCAST) < 0) {
+        return -1;
+    }
+    return 0;
 }
