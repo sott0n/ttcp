@@ -27,6 +27,8 @@
 #define IFNAMSIZ (16)
 #endif
 
+struct netdev;
+
 struct netif {
     struct netif *next;
     uint8_t family;
@@ -68,10 +70,18 @@ struct netdev {
     void *priv;
 };
 
-extern int netdev_driver_register(struct netdev_def *def);
-extern int netdev_proto_register(unsigned short type, void (*handler)(uint8_t *packet, size_t plen, struct netdev *dev));
+extern int
+netdev_driver_register(struct netdev_def *def);
+extern int
+netdev_proto_register(unsigned short type, void (*handler)(uint8_t *packet, size_t plen, struct netdev *dev));
 
-extern struct netdev *netdev_root(void);
-extern struct netdev *netdev_alloc(uint16_t type);
-extern int netdev_add_netif(struct netdev *dev, struct netif *netif);
-extern struct netif *netdev_get_netif(struct netdev *dev, int family);
+extern struct netdev *
+netdev_root(void);
+extern struct netdev *
+netdev_alloc(uint16_t type);
+extern int
+netdev_add_netif(struct netdev *dev, struct netif *netif);
+extern struct netif *
+netdev_get_netif(struct netdev *dev, int family);
+
+#endif
