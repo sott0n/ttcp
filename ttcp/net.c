@@ -23,8 +23,8 @@ static struct netdev_driver *drivers;
 static struct netdev_proto *protos;
 static struct netdev *devices;
 
-int
-netdev_driver_register(struct netdev_def *def) {
+int netdev_driver_register(struct netdev_def *def)
+{
     struct netdev_driver *entry;
 
     for (entry = drivers; entry; entry = entry->next) {
@@ -47,8 +47,8 @@ netdev_driver_register(struct netdev_def *def) {
     return 0;
 }
 
-int
-netdev_proto_register(unsigned short type, void (*handler)(uint8_t *packet, size_t plen, struct netdev *dev)) {
+int netdev_proto_register(unsigned short type, void (*handler)(uint8_t *packet, size_t plen, struct netdev *dev))
+{
     struct netdev_proto *entry;
 
     for (entry = protos; entry; entry = entry->next) {
@@ -67,13 +67,13 @@ netdev_proto_register(unsigned short type, void (*handler)(uint8_t *packet, size
     return 0;
 }
 
-struct netdev *
-netdev_root(void) {
+struct netdev *netdev_root(void)
+{
     return devices;
 }
 
-static void
-netdev_rx_handler(struct netdev *dev, uint16_t type, uint8_t *packet, size_t plen) {
+static void netdev_rx_handler(struct netdev *dev, uint16_t type, uint8_t *packet, size_t plen)
+{
     struct netdev_proto *entry;
 
     for (entry = protos; entry; entry = entry->next) {
@@ -84,8 +84,8 @@ netdev_rx_handler(struct netdev *dev, uint16_t type, uint8_t *packet, size_t ple
     }
 }
 
-struct netdev *
-netdev_alloc(uint16_t type) {
+struct netdev *netdev_alloc(uint16_t type)
+{
     struct netdev_driver *driver;
     struct netdev *dev;
 
@@ -114,8 +114,8 @@ netdev_alloc(uint16_t type) {
     return dev;
 }
 
-int
-netdev_add_netif(struct netdev *dev, struct netif *netif) {
+int netdev_add_netif(struct netdev *dev, struct netif *netif)
+{
     struct netif *entry;
 
     for (entry = dev->ifs; entry; entry = entry->next) {
@@ -129,8 +129,8 @@ netdev_add_netif(struct netdev *dev, struct netif *netif) {
     return 0;
 }
 
-struct netif *
-netdev_get_netif(struct netdev *dev, int family) {
+struct netif *netdev_get_netif(struct netdev *dev, int family)
+{
     struct netif *entry;
 
     for (entry = dev->ifs; entry; entry->next) {

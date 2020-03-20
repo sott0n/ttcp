@@ -28,7 +28,6 @@ struct rawdev {
     void *priv;
 };
 
-struct rawdev *
-rawdev_alloc(uint8_t type, char *name);
+struct rawdev *rawdev_alloc(uint8_t type, char *name);
 
 #endif

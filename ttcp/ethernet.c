@@ -27,8 +27,8 @@ struct ethernet_priv {
 const uint8_t ETHERNET_ADDR_ANY[ETHERNET_ADDR_LEN] = {"\x00\x00\x00\x00\x00\x00"};
 const uint8_t ETHERNET_ADDR_BROADCAST[ETHERNET_ADDR_LEN] = {"\xff\xff\xff\xff\xff\xff"};
 
-int
-ethernet_addr_pton(const char *p, ethernet_addr_t *n) {
+int ethernet_addr_pton(const char *p, ethernet_addr_t *n)
+{
     int index;
     char *ep;
     long val;
@@ -50,8 +50,8 @@ ethernet_addr_pton(const char *p, ethernet_addr_t *n) {
     return 0;
 }
 
-static const char *
-ethernet_type_ntoa(uint16_t type) {
+static const char *ethernet_type_ntoa(uint16_t type)
+{
     switch (ntoh16(type)) {
     case ETHERNET_TYPE_IP:
         return "IP";
@@ -63,8 +63,8 @@ ethernet_type_ntoa(uint16_t type) {
     return "UNKNOWN";
 }
 
-char *
-ethernet_addr_ntop(const uint8_t *n, char *p, size_t size) {
+char *ethernet_addr_ntop(const uint8_t *n, char *p, size_t size)
+{
     if (!n || !p) {
         return NULL;
     }
@@ -72,8 +72,8 @@ ethernet_addr_ntop(const uint8_t *n, char *p, size_t size) {
     return p;
 }
 
-void
-ethernet_dump(struct netdev *dev, uint8_t *frame, size_t flen) {
+void ethernet_dump(struct netdev *dev, uint8_t *frame, size_t flen)
+{
     struct ethernet_hdr *hdr;
     char addr[ETHERNET_ADDR_STR_LEN];
 
@@ -86,7 +86,8 @@ ethernet_dump(struct netdev *dev, uint8_t *frame, size_t flen) {
     hexdump(stderr, frame, flen);
 }
 
-int ethernet_open(struct netdev *dev, int opt) {
+int ethernet_open(struct netdev *dev, int opt)
+{
     struct ethernet_priv *priv;
     struct rawdev *raw;
 
@@ -116,8 +117,8 @@ int ethernet_open(struct netdev *dev, int opt) {
     return 0;
 }
 
-static int
-ethernet_close(struct netdev *dev) {
+static int ethernet_close(struct netdev *dev)
+{
     struct ethernet_priv *priv;
 
     if (!dev || !dev->priv) {
@@ -135,8 +136,8 @@ ethernet_close(struct netdev *dev) {
     return 0;
 }
 
-static void
-ethernet_rx(uint8_t *frame, size_t flen, void *arg) {
+static void ethernet_rx(uint8_t *frame, size_t flen, void *arg)
+{
     struct netdev *dev;
     struct ethernet_hdr *hdr;
     uint8_t *payload;
@@ -161,8 +162,8 @@ ethernet_rx(uint8_t *frame, size_t flen, void *arg) {
     dev->rx_handler(dev, hdr->type, payload, plen);
 }
 
-static void
-ethernet_rx_thread(void *arg) {
+static void ethernet_rx_thread(void *arg)
+{
     struct netdev *dev;
     struct ethernet_priv *priv;
 
@@ -174,8 +175,8 @@ ethernet_rx_thread(void *arg) {
     return NULL;
 }
 
-static int
-ethernet_run(struct netdev *dev) {
+static int ethernet_run(struct netdev *dev)
+{
     struct ethernet_priv *priv;
 
     int err;
@@ -188,8 +189,8 @@ ethernet_run(struct netdev *dev) {
     return 0;
 }
 
-static int
-ethernet_stop(struct netdev *dev) {
+static int ethernet_stop(struct netdev *dev)
+{
     struct ethernet_priv *priv;
 
     priv = dev->priv;
@@ -200,8 +201,8 @@ ethernet_stop(struct netdev *dev) {
     return 0;
 }
 
-static ssize_t
-ethernet_tx(struct netdev *dev, uint16_t type, const uint8_t *payload, size_t plen, const void *dst) {
+static ssize_t ethernet_tx(struct netdev *dev, uint16_t type, const uint8_t *payload, size_t plen, const void *dst)
+{
     struct ethernet_priv *priv;
     uint8_t frame[ETHERNET_FRAME_SIZE_MAX];
     struct ethernet_hdr *hdr;
@@ -242,8 +243,8 @@ struct netdev_def ethernet_def = {
     .ops = &ethernet_ops
 };
 
-int
-ethernet_init(void) {
+int ethernet_init(void)
+{
     if (netdev_driver_register(&ethernet_def) == -1) {
         return -1;
     }

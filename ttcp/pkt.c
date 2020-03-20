@@ -14,7 +14,8 @@ struct pkt {
     int soc;
 };
 
-pkt_t *pkt_open(const char *name) {
+pkt_t *pkt_open(const char *name)
+{
     pkt_t *obj;
     struct ifreq ifr;
     struct sockaddr_ll sockaddr;
@@ -62,7 +63,8 @@ pkt_t *pkt_open(const char *name) {
     return obj;
 }
 
-void pkt_close(pkt_t *obj) {
+void pkt_close(pkt_t *obj)
+{
     if (obj) {
         if (obj->soc != -1) {
             close(obj->soc);
@@ -71,14 +73,16 @@ void pkt_close(pkt_t *obj) {
     }
 }
 
-ssize_t pkt_write(pkt_t *obj, const uint8_t *buffer, size_t length) {
+ssize_t pkt_write(pkt_t *obj, const uint8_t *buffer, size_t length)
+{
     if (!obj || !buffer) {
         return -1;
     }
     return write(obj->soc, buffer, length);
 }
 
-ssize_t pkt_read(pkt_t *obj, uint8_t *buffer, size_t length) {
+ssize_t pkt_read(pkt_t *obj, uint8_t *buffer, size_t length)
+{
     if (!obj | !buffer) {
         return -1;
     }

@@ -16,8 +16,8 @@ struct soc_dev {
     int fd;
 };
 
-struct soc_dev *
-soc_dev_open(char *name) {
+struct soc_dev *soc_dev_open(char *name)
+{
     struct soc_dev *dev;
     struct ifreq ifr;
     struct sockaddr_ll sockaddr;
@@ -63,16 +63,16 @@ ERROR:
     return NULL;
 }
 
-void
-soc_dev_close(struct soc_dev *dev) {
+void soc_dev_close(struct soc_dev *dev)
+{
     if (dev->fd != -1) {
         close(dev->fd);
     }
     free(dev);
 }
 
-void
-soc_dev_rx(struct soc_dev *dev, void (*callback)(uint8_t *, size_t, void *), void *arg, int timeout) {
+void soc_dev_rx(struct soc_dev *dev, void (*callback)(uint8_t *, size_t, void *), void *arg, int timeout)
+{
     struct pullfd pfd;
     int ret;
     ssize_t len;
@@ -99,13 +99,13 @@ soc_dev_rx(struct soc_dev *dev, void (*callback)(uint8_t *, size_t, void *), voi
     callback(buf, len, arg);
 }
 
-ssize_t
-soc_dev_tx(struct soc_dev *dev, const uint8_t *buf, size_t len) {
+ssize_t soc_dev_tx(struct soc_dev *dev, const uint8_t *buf, size_t len)
+{
     return write(dev->fd, buf, len);
 }
 
-int
-soc_dev_addr(char *name, uint8_t *dst, size_t size) {
+int soc_dev_addr(char *name, uint8_t *dst, size_t size)
+{
     int fd;
     struct ifreq ifr;
 
@@ -128,29 +128,29 @@ soc_dev_addr(char *name, uint8_t *dst, size_t size) {
 
 #include "raw.h"
 
-static int
-soc_dev_open_wrap(struct rawdev *dev) {
+static int soc_dev_open_wrap(struct rawdev *dev)
+{
     dev->priv = soc_dev_open(dev->name);
     return dev->priv ? 0 : -1;
 }
 
-static void
-soc_dev_close_wrap(struct rawdev *dev) {
+static void soc_dev_close_wrap(struct rawdev *dev)
+{
     soc_dev_close(dev->priv);
 }
 
-static void
-soc_dev_rx_wrap(struct rawdev *dev, void (*callback)(uint8_t *, size_t, void *), void *arg, int timeout) {
+static void soc_dev_rx_wrap(struct rawdev *dev, void (*callback)(uint8_t *, size_t, void *), void *arg, int timeout)
+{
     soc_dev_rx(dev->priv, callback, arg, timeout);
 }
 
-static ssize_t
-soc_dev_tx_wrap(struct rawdev *dev, const uint8_t *buf, size_t len) {
+static ssize_t soc_dev_tx_wrap(struct rawdev *dev, const uint8_t *buf, size_t len)
+{
     return soc_dev_tx(dev->priv, buf, len);
 }
 
-static int
-soc_dev_addr_wrap(struct rawdev *dev, uint8_t *dst, size_t size) {
+static int soc_dev_addr_wrap(struct rawdev *dev, uint8_t *dst, size_t size)
+{
     return soc_dev_addr(dev->name, dst, size);
 }
 

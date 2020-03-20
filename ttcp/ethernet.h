@@ -24,12 +24,8 @@
 extern const uint8_t ETHERNET_ADDR_ANY[ETHERNET_ADDR_LEN];
 extern const uint8_t ETHERNET_ADDR_BROADCAST[ETHERNET_ADDR_LEN];
 
-extern int
-ethernet_addr_pton(const char *p, uint8_t *n);
-extern char
-ethernet_addr_ntop(const uint8_t *n, char *p, size_t size);
-
-extern int
-ethernet_init(void);
+extern int ethernet_addr_pton(const char *p, uint8_t *n);
+extern char ethernet_addr_ntop(const uint8_t *n, char *p, size_t size);
+extern int ethernet_init(void);
 
 #endif

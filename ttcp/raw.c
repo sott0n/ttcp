@@ -21,16 +21,16 @@ extern struct rawdev_ops soc_dev_ops;
 extern struct rawdev_ops bpf_dev_ops;
 #endif
 
-static uint8_t
-rawdev_detect_type(char *name) {
+static uint8_t rawdev_detect_type(char *name)
+{
     if (strncmp(name, "tap", 3) == 0) {
         return RAWDEV_TYPE_TAP;
     }
     return RAWDEV_TYPE_DEFAULT;
 }
 
-struct rawdev *
-rawdev_alloc(uint8_t type, char *name) {
+struct rawdev *rawdev_alloc(uint8_t type, char *name)
+{
     struct rawdev *raw;
     struct rawdev_ops *ops;
 

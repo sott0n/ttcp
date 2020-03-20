@@ -6,8 +6,8 @@
 #include <ctype.h>
 #include "util.h"
 
-void
-hexdump(FILE *fp, void *data, size_t size) {
+void hexdump(FILE *fp, void *data, size_t size)
+{
     int offset, index;
     unsigned char *src;
 
@@ -39,8 +39,8 @@ hexdump(FILE *fp, void *data, size_t size) {
     fprintf(fp, "+------+-------------------------------------------------+------------------+\n");
 }
 
-int
-fdputc(int fd, int c) {
+int fdputc(int fd, int c)
+{
     ssize_t ret;
 
 RETRY:
@@ -54,8 +54,8 @@ RETRY:
     return c;
 }
 
-int
-fdgetc(int fd) {
+int fdgetc(int fd)
+{
     int c;
     ssize_t ret;
 
@@ -70,8 +70,8 @@ RETRY:
     return c;
 }
 
-uint16_t
-cksum16(uint16_t *data, uint16_t size, uint32_t init) {
+uint16_t cksum16(uint16_t *data, uint16_t size, uint32_t init)
+{
     uint32_t sum;
 
     sum = init;
@@ -87,8 +87,8 @@ cksum16(uint16_t *data, uint16_t size, uint32_t init) {
     return ~(uint16_t)sum;
 }
 
-struct queue_entry *
-queue_push(struct queue_head *queue, void *data, size_t size) {
+struct queue_entry *queue_push(struct queue_head *queue, void *data, size_t size)
+{
     struct queue_entry *entry;
 
     if (!queue || !data) {
@@ -112,8 +112,8 @@ queue_push(struct queue_head *queue, void *data, size_t size) {
     return entry;
 };
 
-struct queue_entry *
-queue_pop(struct queue_head *queue) {
+struct queue_entry *queue_pop(struct queue_head *queue)
+{
     struct queue_entry *entry;
 
     if (!queue || !queue->next) {
@@ -137,57 +137,57 @@ queue_pop(struct queue_head *queue) {
 
 static int endian;
 
-int
-byteorder(void) {
+int byteorder(void)
+{
     uint32_t x = 0x00000001;
 
     return *(uint8_t *)&x ? __LITTLE_ENDIAN : __BIG_ENDIAN;
 }
 
-uint16_t
-byteswap16(uint16_t v) {
+uint16_t byteswap16(uint16_t v)
+{
     return (v & 0x00ff) << 8 | (v & 0xff00) >> 8;
 }
 
-uint32_t
-byteswap32(uint32_t v) {
+uint32_t byteswap32(uint32_t v)
+{
     return (v & 0x000000ff) << 24 | (v & 0x0000ff00) << 8 | (v & 0x00ff0000) >> 8 | (v & 0xff000000) >> 24;
 }
 
-uint16_t
-hton16(uint16_t h) {
+uint16_t hton16(uint16_t h)
+{
     if (!endian) {
         endian = byteorder();
     }
     return endian == __LITTLE_ENDIAN ? byteswap16(h) : h;
 }
 
-uint16_t
-ntoh16(uint16_t n) {
+uint16_t ntoh16(uint16_t n)
+{
     if (!endian) {
         endian = byteorder();
     }
     return endian == __LITTLE_ENDIAN ? byteswap16(n) : n;
 }
 
-uint32_t
-hton32(uint32_t h) {
+uint32_t hton32(uint32_t h)
+{
     if (!endian) {
         endian = byteorder();
     }
     return endian == __LITTLE_ENDIAN ? byteswap32(h) : h;
 }
 
-uint32_t
-ntoh32(uint32_t n) {
+uint32_t ntoh32(uint32_t n)
+{
     if (!endian) {
         endian = byteorder();
     }
     return endian == __LITTLE_ENDIAN ? byteswap32(n) : n;
 }
 
-void
-maskset(uint32_t *mask, size_t size, size_t offset, size_t len) {
+void maskset(uint32_t *mask, size_t size, size_t offset, size_t len)
+{
     size_t idx, so, sb, bl;
 
     so = offset / 32;
@@ -204,8 +204,8 @@ maskset(uint32_t *mask, size_t size, size_t offset, size_t len) {
     }
 }
 
-int
-maskchk(uint32_t *mask, size_t size, size_t offset, size_t len) {
+int maskchk(uint32_t *mask, size_t size, size_t offset, size_t len)
+{
     size_t idx, so, sb, bl;
 
     so = offset / 32;
@@ -229,14 +229,14 @@ maskchk(uint32_t *mask, size_t size, size_t offset, size_t len) {
     return 1;
 }
 
-void
-maskclr(uint32_t *mask, size_t size) {
+void maskclr(uint32_t *mask, size_t size)
+{
     memset(mask, 0, sizeof(*mask) * size);
 }
 
 #define ISBIT(x) (x ? 1 : 0)
-void
-maskdbg(void *mask, size_t size) {
+void maskdbg(void *mask, size_t size)
+{
     uint8_t *ptr;
 
     for (ptr = (uint8_t *)mask; ptr < (uint8_t *)mask + size; ptr++) {
@@ -245,4 +245,3 @@ maskdbg(void *mask, size_t size) {
             ISBIT(*ptr & 0x10), ISBIT(*ptr & 0x20), ISBIT(*ptr & 0x40), ISBIT(*ptr &0x80));
     }
 }
-

@@ -21,11 +21,10 @@ struct tap_dev {
     int fd;
 };
 
-void
-tap_dev_close(struct tap_dev *dev);
+void tap_dev_close(struct tap_dev *dev);
 
-struct tap_dev *
-tap_dev_open(char *name) {
+struct tap_dev * tap_dev_open(char *name)
+{
     struct tap_dev *dev;
     struct ifreq ifr;
 
@@ -54,16 +53,16 @@ ERROR:
     return NULL;
 }
 
-void
-tap_dev_close(struct tap_dev *dev) {
+void tap_dev_close(struct tap_dev *dev)
+{
     if (dev->fd != -1) {
         close(dev->fd);
     }
     free(dev);
 }
 
-void
-tap_dev_rx(struct tap_dev *dev, void (*callback)(uint8_t *, size_t, void *), void *arg, int timeout) {
+void tap_dev_rx(struct tap_dev *dev, void (*callback)(uint8_t *, size_t, void *), void *arg, int timeout)
+{
     struct pollfd pfd;
     int ret;
     ssize_t len;
@@ -90,13 +89,13 @@ tap_dev_rx(struct tap_dev *dev, void (*callback)(uint8_t *, size_t, void *), voi
     callback(buf, len, arg);
 }
 
-ssize_t
-tap_dev_tx(struct tap_dev *dev, const uint8_t *buf, size_t len) {
+ssize_t tap_dev_tx(struct tap_dev *dev, const uint8_t *buf, size_t len)
+{
     return write(dev->fd, buf, len);
 }
 
-int
-tap_dev_addr(char *name, uint8_t *dst, size_t size) {
+int tap_dev_addr(char *name, uint8_t *dst, size_t size)
+{
     int soc;
     struct ifreq ifr;
 
@@ -119,29 +118,29 @@ tap_dev_addr(char *name, uint8_t *dst, size_t size) {
 
 #include "raw.h"
 
-static int
-tap_dev_open_wrap(struct rawdev *dev) {
+static int tap_dev_open_wrap(struct rawdev *dev)
+{
     dev->priv = tap_dev_open(dev->name);
     return dev->priv ? 0 : -1;
 }
 
-static void
-tap_dev_close_wrap(struct rawdev *dev) {
+static void tap_dev_close_wrap(struct rawdev *dev)
+{
     tap_dev_close(dev->priv);
 }
 
-static void
-tap_dev_rx_wrap(struct rawdev *dev, void (*callback)(uint8_t *, size_t, void *), void *arg, int timeout) {
+static void tap_dev_rx_wrap(struct rawdev *dev, void (*callback)(uint8_t *, size_t, void *), void *arg, int timeout)
+{
     tap_dev_rx(dev->priv, callback, arg, timeout);
 }
 
-static ssize_t
-tap_dev_tx_wrap(sturct rawdev *dev, const uint8_t *buf, size_t len) {
+static ssize_t tap_dev_tx_wrap(sturct rawdev *dev, const uint8_t *buf, size_t len)
+{
     return tap_dev_tx(dev->priv, buf, len);
 }
 
-static int
-tap_dev_addr_wrap(struct rawdev *dev, uint8_t *dst, size_t size) {
+static int tap_dev_addr_wrap(struct rawdev *dev, uint8_t *dst, size_t size)
+{
     return tap_dev_addr(dev->name, dst, size);
 }
 

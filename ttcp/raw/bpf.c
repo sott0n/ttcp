@@ -23,8 +23,8 @@ struct bpf_dev {
     char *buf;
 };
 
-int
-bpf_dev_open(char *name) {
+int bpf_dev_open(char *name)
+{
     struct bpf_dev *dev;
     int index, disable = 0, enable = 1;
     char path[16];
@@ -93,8 +93,8 @@ ERROR:
     return NULL;
 }
 
-void
-bpf_dev_close(struct bpf_dev *dev) {
+void bpf_dev_close(struct bpf_dev *dev)
+{
     if (dev->fd != -1) {
         close(dev->fd);
         free(dev->buf);
@@ -102,8 +102,8 @@ bpf_dev_close(struct bpf_dev *dev) {
     free(dev);
 }
 
-void
-bpf_dev_rx(struct bpf_dev *dev, void (*callback)(uint8_t *, size_t, void *), void *arg, int timeout) {
+void bpf_dev_rx(struct bpf_dev *dev, void (*callback)(uint8_t *, size_t, void *), void *arg, int timeout)
+{
     struct pollfd pfd;
     int ret;
     ssize_t len;
@@ -132,13 +132,13 @@ bpf_dev_rx(struct bpf_dev *dev, void (*callback)(uint8_t *, size_t, void *), voi
     }
 }
 
-ssize_t
-bpf_dev_tx(struct bpf_dev *dev, const uint8_t *buf, size_t len) {
+ssize_t bpf_dev_tx(struct bpf_dev *dev, const uint8_t *buf, size_t len)
+{
     return write(dev->fd, buf, len);
 }
 
-int
-bpf_dev_addr(char *name, uint8_t *dst, size_t size) {
+int bpf_dev_addr(char *name, uint8_t *dst, size_t size)
+{
     struct ifaddrs *ifas, *ifa;
     struct sockaddr_dl *dl;
 
@@ -160,29 +160,29 @@ bpf_dev_addr(char *name, uint8_t *dst, size_t size) {
 
 #include "raw.h"
 
-static int
-bpf_dev_open_wrap(struct rawdev *dev) {
+static int bpf_dev_open_wrap(struct rawdev *dev)
+{
     dev->priv = bpf_dev_open(dev->name);
     return dev->priv ? 0 : -1;
 }
 
-static void
-bpf_dev_close_wrap(struct rawdev *dev) {
+static void bpf_dev_close_wrap(struct rawdev *dev)
+{
     bpf_dev_close(dev->priv);
 }
 
-static void
-bpf_dev_rx_wrap(struct rawdev *dev, void (*callback)(uint8_t *, size_t, void *), void *arg, int timeout) {
+static void bpf_dev_rx_wrap(struct rawdev *dev, void (*callback)(uint8_t *, size_t, void *), void *arg, int timeout)
+{
     bpf_dev_rx(dev->priv, callback, arg, timeout);
 }
 
-static ssize_t
-bpf_dev_tx_wrap(struct rawdev *dev, const uint8_t *buf, size_t len) {
+static ssize_t bpf_dev_tx_wrap(struct rawdev *dev, const uint8_t *buf, size_t len)
+{
     return bpf_dev_tx(dev->priv, buf, len);
 }
 
-static int
-bpf_dev_addr_wrap(struct rawdev *dev, uint8_t *dst, size_t size) {
+static int bpf_dev_addr_wrap(struct rawdev *dev, uint8_t *dst, size_t size)
+{
     return bpf_dev_addr(dev->name, dst, size);
 }
 

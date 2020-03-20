@@ -25,11 +25,13 @@ static struct {
     int handler_num;
 } g_ip;
 
-ip_addr_t *ip_get_addr(void) {
+ip_addr_t *ip_get_addr(void)
+{
     return &g_ip.addr;
 }
 
-int ip_set_addr(const char *addr, const char *mask) {
+int ip_set_addr(const char *addr, const char *mask)
+{
     if (ip_addr_pton(addr, &g_ip.addr) == -1) {
         return -1;
     }
@@ -40,11 +42,13 @@ int ip_set_addr(const char *addr, const char *mask) {
     return 0;
 }
 
-int ip_set_gw(const char *gw) {
+int ip_set_gw(const char *gw)
+{
     return ip_addr_pton(gw, &g_ip.gw);
 }
 
-int ip_add_handler(uint16_t type, __ip_handler_t handler) {
+int ip_add_handler(uint16_t type, __ip_handler_t handler)
+{
     if (g_ip.handler_num >= IP_HANDLER_TABLE_SIZE) {
         return -1;
     }
@@ -54,7 +58,8 @@ int ip_add_handler(uint16_t type, __ip_handler_t handler) {
     return 0;
 }
 
-void ip_recv(uint8_t *dgram, size_t dlen, ethernet_addr_t *src, ethernet_addr_t *dst) {
+void ip_recv(uint8_t *dgram, size_t dlen, ethernet_addr_t *src, ethernet_addr_t *dst)
+{
     struct ip_hdr *hdr;
     uint16_t hlen;
     int offset;
@@ -96,7 +101,8 @@ void ip_recv(uint8_t *dgram, size_t dlen, ethernet_addr_t *src, ethernet_addr_t 
     }
 }
 
-ssize_t ip_send(uint8_t protocol, const uint8_t *buf, size_t len, const ip_addr_t *dst) {
+ssize_t ip_send(uint8_t protocol, const uint8_t *buf, size_t len, const ip_addr_t *dst)
+{
     uint8_t packet[1500];
     struct ip_hdr *hdr;
     static uint16_t hlen, ip = 0;
@@ -125,7 +131,8 @@ ssize_t ip_send(uint8_t protocol, const uint8_t *buf, size_t len, const ip_addr_
     return 0;
 }
 
-int ip_addr_pton(const char *p, ip_addr_t *n) {
+int ip_addr_pton(const char *p, ip_addr_t *n)
+{
     struct in_addr addr;
 
     addr.s_addr = *n;
@@ -136,7 +143,8 @@ int ip_addr_pton(const char *p, ip_addr_t *n) {
     return 0;
 }
 
-char *ip_addr_ntop(const ip_addr_t *n, char *p, size_t size) {
+char *ip_addr_ntop(const ip_addr_t *n, char *p, size_t size)
+{
     struct in_addr addr;
 
     addr.s_addr = *n;
@@ -146,14 +154,17 @@ char *ip_addr_ntop(const ip_addr_t *n, char *p, size_t size) {
     return p;
 }
 
-int ip_addr_cmp(const ip_addr_t *a, const ip_addr_t *b) {
+int ip_addr_cmp(const ip_addr_t *a, const ip_addr_t *b)
+{
     return memcmp(a, b, sizeof(ip_addr_t));
 }
 
-int ip_addr_isself(const ip_addr_t *addr) {
+int ip_addr_isself(const ip_addr_t *addr)
+{
     return (*addr == g_ip.addr);
 }
 
-int ip_addr_islink(const ip_addr_t *addr) {
+int ip_addr_islink(const ip_addr_t *addr)
+{
     return (*addr & g_ip.mask) == (g_ip.addr & g_ip.mask);
 }

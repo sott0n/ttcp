@@ -50,8 +50,8 @@ static struct arp_entry arp_table[ARP_TABLE_SIZE];
 static time_t timestamp;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-static char*
-arp_opcode_ntop(uint16_t opcode) {
+static char *arp_opcode_ntop(uint16_t opcode)
+{
     switch (ntoh16(opcode)) {
     case ARP_OP_REQUEST:
         return "REQUEST";
@@ -61,7 +61,8 @@ arp_opcode_ntop(uint16_t opcode) {
     return "UNKNOWN";
 }
 
-void arp_dump (uint8_t *packet, size_t plen) {
+void arp_dump (uint8_t *packet, size_t plen)
+{
     struct arp_ethernet *message;
     char addr[128];
 
@@ -77,8 +78,8 @@ void arp_dump (uint8_t *packet, size_t plen) {
     fprintf(stderr, " tpa: %s\n", ip_addr_ntop(message->tpa, addr, sizeof(addr)));
 }
 
-static struct arp_entry *
-arp_table_select(const op_addr_t *pa) {
+static struct arp_entry *arp_table_select(const op_addr_t *pa)
+{
     struct arp_entry *entry;
 
     for (entry = arp_table; entry < array_tailof(arp_table); entry++) {
@@ -89,8 +90,8 @@ arp_table_select(const op_addr_t *pa) {
     return NULL;
 }
 
-static int
-arp_table_update(struct netdev *dev, const ip_addr_t *pa, const uint8_t *ha) {
+static int arp_table_update(struct netdev *dev, const ip_addr_t *pa, const uint8_t *ha)
+{
     struct arp_entry *entry;
 
     entry = arp_table_select(pa);
@@ -113,8 +114,8 @@ arp_table_update(struct netdev *dev, const ip_addr_t *pa, const uint8_t *ha) {
     return 0;
 }
 
-static struct arp_entry *
-arp_table_freespace(void) {
+static struct arp_entry *arp_table_freespace(void)
+{
     struct arp_entry *entry;
 
     for (entry = arp_table; entry < array_tailof(arp_table); entry++) {
@@ -125,8 +126,8 @@ arp_table_freespace(void) {
     return NULL;
 }
 
-static int
-arp_table_insert(const ip_addr_t *pa, const uint8_t *ha) {
+static int arp_table_insert(const ip_addr_t *pa, const uint8_t *ha)
+{
     struct arp_entry *entry;
 
     entry = arp_table_freespace();
@@ -141,8 +142,8 @@ arp_table_insert(const ip_addr_t *pa, const uint8_t *ha) {
     return 0;
 }
 
-static void
-arp_entry_clear(struct arp_entry *entry) {
+static void arp_entry_clear(struct arp_entry *entry)
+{
     entry->used = 0;
     entry->pa = 0;
     memset(entry->ha, 0, ETHERNET_ADDR_LEN);
@@ -155,8 +156,8 @@ arp_entry_clear(struct arp_entry *entry) {
     entry->netif = NULL;
 }
 
-static void
-arp_table_patrol(void) {
+static void arp_table_patrol(void)
+{
     struct arp_entry *entry;
 
     for (entry = arp_table; entry < array_tailof(arp_table); entry++) {
@@ -167,8 +168,8 @@ arp_table_patrol(void) {
     }
 }
 
-static int
-arp_send_request(struct netif *netif, const ip_addr_t *pa) {
+static int arp_send_request(struct netif *netif, const ip_addr_t *pa)
+{
     struct arp_ethernet request;
 
     if (!tpa) {
@@ -193,8 +194,8 @@ arp_send_request(struct netif *netif, const ip_addr_t *pa) {
     return 0;
 }
 
-static int
-arp_send_reply(struct netif *netif, const uint8_t *tha, const ip_addr_t *tpa, const uint8_t *dst) {
+static int arp_send_reply(struct netif *netif, const uint8_t *tha, const ip_addr_t *tpa, const uint8_t *dst)
+{
     struct arp_ethernet reply;
 
     if (!tha || !tpa) {
@@ -220,8 +221,8 @@ arp_send_reply(struct netif *netif, const uint8_t *tha, const ip_addr_t *tpa, co
     return 0;
 }
 
-static void
-arp_rx(uint8_t *packet, size_t plen, struct netdev *dev) {
+static void arp_rx(uint8_t *packet, size_t plen, struct netdev *dev)
+{
     struct arp_ethernet *message;
     time_t now;
     int marge = 0;
@@ -269,8 +270,8 @@ arp_rx(uint8_t *packet, size_t plen, struct netdev *dev) {
     return;
 }
 
-int
-arp_resolve(struct netif *netif, const ip_addr_t *pa, uint8_t *ha, const void *data, size_t len) {
+int arp_resolve(struct netif *netif, const ip_addr_t *pa, uint8_t *ha, const void *data, size_t len)
+{
     struct timeval now;
     struct timespec timeout;
     struct arp_entry *entry;
@@ -322,8 +323,8 @@ arp_resolve(struct netif *netif, const ip_addr_t *pa, uint8_t *ha, const void *d
     return ARP_RESOLVE_QUERY;
 }
 
-int
-arp_init(void) {
+int arp_init(void)
+{
     struct arp_entry *entry;
 
     time(&timestamp);

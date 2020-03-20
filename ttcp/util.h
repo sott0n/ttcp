@@ -28,33 +28,19 @@ struct queue_head {
     unsigned int num;
 };
 
-extern void
-hexdump(FILE *fp, void *data, size_t size);
-extern int
-fdputc(int fd, int c);
-extern int
-fdgetc(int fd);
-extern uint16_t
-cksum16(uint16_t *data, uint16_t size, uint32_t init);
-extern struct queue_entry *
-queue_push(struct queue_head *queue, void *data, size_t size);
-extern struct queue_entry *
-queue_pop(struct queue_head *queue);
-extern uint16_t
-hton16(uint16_t h);
-extern uint16_t
-ntoh16(uint16_t n);
-extern uint32_t
-hton32(uint32_t h);
-extern uint32_t
-ntoh32(uint32_t n);
-extern void
-maskset(uint32_t *mask, size_t size, size_t offset, size_t len);
-extern void
-maskchk(uint32_t *mask, size_t size, size_t offset, size_t len);
-extern void
-maskclr(uint32_t *mask, size_t size);
-extern void
-maskdbg(void *mask, size_t size);
+extern void hexdump(FILE *fp, void *data, size_t size);
+extern int fdputc(int fd, int c);
+extern int fdgetc(int fd);
+extern uint16_t cksum16(uint16_t *data, uint16_t size, uint32_t init);
+extern struct queue_entry *queue_push(struct queue_head *queue, void *data, size_t size);
+extern struct queue_entry *queue_pop(struct queue_head *queue);
+extern uint16_t hton16(uint16_t h);
+extern uint16_t ntoh16(uint16_t n);
+extern uint32_t hton32(uint32_t h);
+extern uint32_t ntoh32(uint32_t n);
+extern void maskset(uint32_t *mask, size_t size, size_t offset, size_t len);
+extern void maskchk(uint32_t *mask, size_t size, size_t offset, size_t len);
+extern void maskclr(uint32_t *mask, size_t size);
+extern void maskdbg(void *mask, size_t size);
 
 #endif
