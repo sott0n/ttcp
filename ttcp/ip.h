@@ -4,15 +4,22 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include "ethernet.h"
+#include "net.h"
+
+#define IP_VERSION_IPV4 4
 
 #define IP_PROTOCOL_ICMP 1
 #define IP_PROTOCOL_TCP 6
 #define IP_PROTOCOL_UDP 17
 #define IP_PROTOCOL_RAW 255
 
+#define IP_HDR_SIZE_MIN 20
+#define IP_HDR_SIZE_MAX 60
+
+#define IP_PAYLOAD_SIZE_MAX (65535 - IP_HDR_SIZE_MIN)
+
 #define IP_ADDR_LEN 4
-#define IP_ADDR_STR_LEN 15
+#define IP_ADDR_STR_LEN 16 /* ddd.ddd.ddd.ddd\n */
 
 typedef uint32_t ip_addr_t;
 
@@ -30,18 +37,29 @@ struct ip_hdr {
     uint8_t options[0];
 };
 
-typedef void (*__ip_handler_t)(uint8_t *, size_t, ip_addr_t *, ip_addr_t *);
+struct netif_ip {
+    struct netif netif;
+    ip_addr_t unicast;
+    ip_addr_t netmask;
+    ip_addr_t network;
+    ip_addr_t broadcast;
+    ip_addr_t gateway;
+};
 
-extern ip_addr_t * ip_get_addr(void);
-extern int ip_set_addr(const char *addr, const char *mask);
-extern int ip_set_gw(const char *gw);
-extern int ip_add_handler(uint8_t protocol, __ip_handler_t handler);
-extern void ip_recv(uint8_t *dgram, ssize_t dlen, ethernet_addr_t *src, ethernet_addr_t *dst);
-extern ssize_t ip_send(uint8_t protocol, const uint8_t *buf, size_t len, const ip_addr_t *addr);
+extern const ip_addr_t IP_ADDR_ANY;
+extern const ip_addr_t IP_ADDR_BROADCAST;
+
 extern int ip_addr_pton(const char *p, ip_addr_t *n);
 extern char *ip_addr_ntop(const ip_addr_t *n, char *p, size_t size);
-extern int ip_addr_cmp(const ip_addr_t *a, const ip_addr_t *b);
-extern int ip_addr_isself(const ip_addr_t *addr);
-extern int ip_addr_islink(const ip_addr_t *addr);
+
+extern struct netif *ip_netif_alloc(const char *addr, const char *netmask, const char *gateway);
+extern struct netif *ip_netif_register(struct netdev *dev, const char *addr, const char *netmask, const char *gateway);
+extern int ip_netif_reconfigure(struct netdev *dev, const char *addr, const char *netmask, const char *gateway);
+extern struct netif *ip_netif_by_addr(ip_addr_t *addr);
+extern struct netif *ip_netif_by_peer(ip_addr_t *peer);
+extern int ip_set_forwarding(int mode);
+extern ssize_t ip_tx(struct netif *netif, uint8_t protocol, const uint8_t *buf, size_t len, const ip_addr_t *addr);
+extern int ip_add_protocol(uint8_t protocol, void (*handler)(uint8_t *, size_t, ip_addr_t *, ip_addr_t *, struct netif *));
+extern int ip_init(void);
 
 #endif
