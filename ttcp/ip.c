@@ -450,3 +450,192 @@ static int ip_forward_process(uint8_t *dgram, size_t dlen, struct netif *netif)
     }
     return ret;
 }
+
+/*
+ * IP CORE
+ */
+
+static void ip_rx(uint8_t *dgram, size_t dlen, struct netdev *dev)
+{
+    struct ip_hdr *hdr;
+    uint16_t hlen, offset;
+    struct netif_ip *iface;
+    uint8_t *payload;
+    size_t plen;
+    struct ip_fragment *fragment = NULL;
+    struct ip_protocol *protocol;
+
+    if (dlen < sizeof(struct ip_hdr)) {
+        return;
+    }
+    hdr = (struct ip_hdr *)dgram;
+    if ((hdr->vhl >> 4) != IP_VERSION_IPV4) {
+        fprintf(stderr, "not ipv4 packet\n");
+        return;
+    }
+    hlen = (hdr->vhl & 0x0f) << 2;
+    if (dlen < hlen || dlen < ntoh16(hdr->len)) {
+        fprintf(stderr, "ip packet length error\n");
+        return;
+    }
+    if (cksum16((uint16_t *)hdr, hlen, 0) != 0) {
+        fprintf(stderr, "ip checksum error\n");
+        return;
+    }
+    if (!hdr->ttl) {
+        fprintf(stderr, "ip packet was dead (TTL=0)\n");
+        return;
+    }
+    iface = (struct netif_ip *)netdev_get_netif(dev, NETIF_FAMILY_IPV4);
+    if (!iface) {
+        fprintf(stderr, "up unknown interface\n");
+        return;
+    }
+    if (hdr->dst != iface->unicast) {
+        if (hdr->dst != iface->broadcast && hdr->dst != IP_ADDR_BROADCAST) {
+            /* for other host */
+            if (ip_forwarding) {
+                ip_forward_process(dgram, dlen, (struct netif *)iface);
+            }
+            return;
+        }
+    }
+#ifdef DEBUG
+    fprintf(stderr, ">>> ip_rx <<<\n");
+    ip_dump((struct netif *)iface, dgram, dlen);
+#endif
+    payload = (uint8_t *)hdr + hlen;
+    plen = ntoh16(hdr->len) - hlen;
+    offset = ntoh16(hdr->offset);
+    if (offset & 0x2000 || offset & 0x1fff) {
+        fragment = ip_fragment_process(hdr, payload, plen);
+        if (!fragment) {
+            return;
+        }
+        payload = fragment->data;
+        plen = fragment->len;
+    }
+    for (protocol = protocols; protocol; protocol = protocol->next) {
+        if (protocol->type == hdr->protocol) {
+            protocol->handler(payload, plen, &hdr->src, &hdr->dst, (struct netif *)iface);
+            break;
+        }
+    }
+    if (fragment) {
+        ip_fragment_free(fragment);
+    }
+}
+
+static int ip_tx_netdev(struct netif *netif, uint8_t *packet, size_t plen, const ip_addr_t *dst)
+{
+    ssize_t ret;
+    uint8_t ha[128] = {};
+
+    if (!(netif->dev->flags & NETDEV_FLAG_NOARP)) {
+        if (dst) {
+            ret = arp_resolve(netif, dst, (void *)ha, packet, plen);
+            if (ret != 1) {
+                return ret;
+            }
+        } else {
+            memcpy(ha, netif->dev->broadcast, netif->dev->alen);
+        }
+    }
+    if (netif->dev->ops->tx(netif->dev, ETHERNET_TYPE_IP, packet, plen, (void *)ha) != (ssize_t)plen) {
+        return -1;
+    }
+    return -1;
+}
+
+static int ip_tx_core(struct netif *netif, uint8_t protocol, const uint8_t *buf, size_t len, const ip_addr_t *src, const ip_addr_t *dst, const ip_addr_t *nexthop, uint16_t id, uint16_t offset)
+{
+    uint8_t packet[4096];
+    struct ip_hdr *hdr;
+    uint16_t hlen;
+
+    hdr = (struct ip_hdr *)packet;
+    hlen = sizeof(struct ip_hdr);
+    hdr->vhl = (IP_VERSION_IPV4 << 4) | (hlen >> 2);
+    hdr->tos = 0;
+    hdr->len = hton16(hlen + len);
+    hdr->id = hton16(id);
+    hdr->offset = hton16(offset);
+    hdr->ttl = 0xff;
+    hdr->protocol = protocol;
+    hdr->sum = 0;
+    hdr->src = src ? *src : ((struct netif_ip *)netif)->unicast;
+    hdr->dst = *dst;
+    hdr->sum = cksum16((uint16_t *)hdr, hlen, 0);
+    memcpy(hdr + 1, buf, len);
+#ifdef DEBUG
+    fprintf(stderr, ">>> ip_tx_core <<<\n");
+    ip_dump(netif, (uint8_t *)packet, hlen + len);
+#endif
+    return ip_tx_netdev(netif, (uint8_t *)packet, hlen + len, nexthop);
+}
+
+static uint16_t ip_generate_id(void)
+{
+    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+    static uint16_t id = 128;
+    uint16_t ret;
+
+    pthread_mutex_lock(&mutex);
+    ret = id++;
+    pthread_mutex_unlock(&mutex);
+    return ret;
+}
+
+ssize_t ip_tx(struct netif *netif, uint8_t protocol, const uint8_t *buf, size_t len, const ip_addr_t *dst)
+{
+    struct ip_route *route;
+    ip_addr_t *nexthop = NULL, *src = NULL;
+    uint16_t id, flag, offset;
+    size_t done, slen;
+
+    if (netif && *dst == IP_ADDR_BROADCAST) {
+        nexthop = NULL;
+    } else {
+        route = ip_route_lookup(NULL, dst);
+        if (!route) {
+            fprintf(stderr, "ip no route to host\n");
+            return -1;
+        }
+        if (netif) {
+            src = &((struct netif_ip *)netif)->unicast;
+        }
+        netif = route->netif;
+        nexthop = (ip_addr_t *)(route->nexthop ? &route->nexthop : dst);
+    }
+    id = ip_generate_id();
+    for (done = 0; done < len; done += slen) {
+        slen = MIN((len - done), (size_t)(netif->dev->mtu - IP_HDR_SIZE_MIN));
+        flag = ((done + slen) < len) ? 0x2000 : 0x0000;
+        offset = flag | ((done >> 3) & 0x1fff);
+        if (ip_tx_core(netif, protocol, buf + done, slen, src, dst, nexthop, id, offset) == -1) {
+            return -1;
+        }
+    }
+    return len;
+}
+
+int ip_add_protocol(uint8_t type, void (*handler)(uint8_t *payload, size_t len, ip_addr_t *src, ip_addr_t *dst, struct netif *netif))
+{
+    struct ip_route *p;
+
+    p = malloc(sizeof(struct ip_protocol));
+    if (!p) {
+        return -1;
+    }
+    p->next = protocols;
+    p->type = type;
+    p->handler = handler;
+    protocols = p;
+    return 0;
+}
+
+int ip_init(void)
+{
+    netdev_proto_register(NETDEV_PROTO_IP, ip_rx);
+    return 0;
+}
