@@ -89,3 +89,43 @@ struct tcp_cb {
     struct queue_head backlog;
     pthread_cond_t cond;
 };
+
+#define TCP_CB_LISTENER_SIZE 128
+
+#define TCP_CB_STATE_RX_ISREADY(x) (x->state == TCP_CB_STATE_ESTABLISHED || x->state == TCP_CB_STATE_FIN_WAIT1 || x->state == TCP_CB_STATE_FIN_WAIT2)
+#define TCP_CB_STATE_TX_ISREADY(x) (x->state == TCP_CB_STATE_ESTABLISHED || x->state == TCP_CB_STATE_CLOSE_WAIT)
+
+#define TCP_SOCKET_ISINVALID(x) (x < 0 || x >= TCP_CB_TABLE_SIZE)
+
+static pthread_t timer_thread;
+struct tcp_cb cb_table[TCP_CB_TABLE_SIZE];
+pthread_mutex_t mutex;
+
+static int tcp_txq_add(struct tcp_cb *cb, struct tcp_hdr *hdr, size_t len)
+{
+    struct tcp_txq_entry *txq;
+
+    txq = malloc(sizeof(struct tcp_txq_entry));
+    if (!txq) {
+        return -1;
+    }
+    txq->segment = malloc(len);
+    if (!txq->segment) {
+        free(txq);
+        return -1;
+    }
+    memcpy(txq->segment, hdr, len);
+    gettimeofday(&txq->timestamp, NULL);
+    txq->next = NULL;
+
+    // set txq to next of tail entry
+    if (cb->txq.head == NULL) {
+        cb->txq.head = txq;
+    } else {
+        cb->txq.tail->next = txq;
+    }
+    // update tail entry
+    cb->txq.tail = txq;
+
+    retunr 0;
+}
