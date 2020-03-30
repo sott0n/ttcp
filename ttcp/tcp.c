@@ -129,3 +129,36 @@ static int tcp_txq_add(struct tcp_cb *cb, struct tcp_hdr *hdr, size_t len)
 
     retunr 0;
 }
+
+static ssize_t tcp_tx(struct tcp_cb *cb, uint32_t seq, uint32_t ack, uint8_t flg, uint8_t *buf, size_t len)
+{
+    uint8_t segment[1500];
+    struct tcp_hdr *hdr;
+    ip_addr_t self, peer;
+    uint32_t pseudo = 0;
+
+    memset(&segment, 0, sizeof(segment));
+    hdr = (struct tcp_hdr *)segment;
+    hdr->src = cb->port;
+    hdr->dst = cb->peer.port;
+    hdr->seq = hton32(seq);
+    hdr->ack = hton32(ack);
+    hdr->off = (sizeof(struct tcp_hdr) >> 2) << 4;
+    hdr->flg = flg;
+    hdr->win = hton16(cb->rcv.wnd);
+    hdr->sum = 0;
+    hdr->urg = 0;
+    memcpy(hdr + 1, buf, len);
+    self = ((struct netif_ip *)cb->iface)->unicast;
+    peer = cb->peer.addr;
+    pseudo += (self >> 16) & 0xffff;
+    pseudo += self & 0xffff;
+    pseudo += (peer >> 16) & 0xffff;
+    pseudo += peer & 0xffff;
+    pseudo += hton16((uint16_t)IP_PROTOCOL_TCP);
+    pseudo += hton16(sizeof(struct tcp_hdr) + len);
+    hdr->sum = cksum16((uint16_t *)hdr, sizeof(struct tcp_hdr) + len, pseudo);
+    ip_tx(cb->iface, IP_PROTOCOL_TCP, (uint8_t *)hdr, sizeof(struct tcp_hdr) + len, &peer);
+    tcp_txq_add(cb, hdr, sizeof(struct tcp_hdr) + len);
+    return len;
+}
