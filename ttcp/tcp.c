@@ -25,12 +25,12 @@
 #define TCP_CB_STATE_CLOSE_WAIT  9
 #define TCP_CB_STATE_LAST_ATK    10
 
-#define TCP_FLG_FIN 0x01
-#define TCP_FLG_SYN 0x02
-#define TCP_FLG_RST 0x04
-#define TCP_FLG_PSH 0x08
-#define TCP_FLG_ACK 0x10
-#define TCP_FLG_URG 0x20
+#define TCP_FLG_FIN 0x01    // no more data from sender
+#define TCP_FLG_SYN 0x02    // Synchronize sequence numbers
+#define TCP_FLG_RST 0x04    // Reset the connection
+#define TCP_FLG_PSH 0x08    // Push Function
+#define TCP_FLG_ACK 0x10    // Acknowledgement field significant
+#define TCP_FLG_URG 0x20    // Urgent Pointer field significant
 
 #define TCP_FLG_IS(x, y) ((x & 0x3f) == (y))
 #define TCP_FLG_ISSET(x, y) ((x & 0x3f) & (y))
