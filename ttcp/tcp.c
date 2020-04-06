@@ -162,3 +162,60 @@ static ssize_t tcp_tx(struct tcp_cb *cb, uint32_t seq, uint32_t ack, uint8_t flg
     tcp_txq_add(cb, hdr, sizeof(struct tcp_hdr) + len);
     return len;
 }
+
+static void *tcp_timer_thread(void *arg)
+{
+    struct timeval timestamp;
+    struct tcp_cb *cb;
+    struct tcp_txq_entry *txq, *prev, *tmp;
+    ip_addr_t peer;
+
+    while (1) {
+        gettimeofday(&timestamp, NULL);
+        pthread_mutex_lock(&mutex);
+        for (cb = cb_table; cb < array_tailof(cb_table); cb++) {
+            prev = NULL;
+            txq = cb->txq.head;
+            while (txq) {
+                if (ntoh32(txq->segment->seq) >= cb->snd.una) {
+                    if (timestamp.tv_sec - txq->timestamp.tv_sec > 3) {
+                        peer = cb->peer.addr;
+                        ip_tx(cb->iface, IP_PROTOCOL_TCP, (uint8_t *)txq->segment, txq->len, &peer);
+                        txq->timestamp = timestamp;
+                    }
+
+                    // update privious tcp_txq_entry
+                    prev = txq;
+                    txq = txq->next;
+                } else {
+                    // remove tcp_txq_entry from list
+                    // do not change prev, just update txq by txq->next,
+                    // and free txq and txq->segment,
+                    // and udpate cb->txq.[head|tail] if needed
+
+                    // swap tail tcp_txq_entry
+                    if (!txq->next) {
+                        // txq is tail entry
+                        cb->txq.tail = prev;
+                    }
+                    // swap previous tcp_txq_entry
+                    if (prev) {
+                        prev->next = txq->next;
+                    } else {
+                        cb->txq.head = txq->next;
+                    }
+
+                    // free tcp_txq_entry
+                    tmp = txq->entry;
+                    free(txq->segment);
+                    free(txq);
+                    // check next entry
+                    txq = tmp;
+                }
+            }
+        }
+        pthread_mutex_unlock(&mutex);
+        usleep(100000);
+    }
+    return NULL;
+}
