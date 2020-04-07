@@ -219,3 +219,186 @@ static void *tcp_timer_thread(void *arg)
     }
     return NULL;
 }
+
+static void tcp_incoming_event(struct tcp_cb *cb, struct tcp_hdr *hdr, size_t len)
+{
+    uint32_t seq, ack;
+    size_t hlen, plen;
+
+    hlen = ((hdr->off >> 4) << 2);
+    plen = len - hlen;
+    switch(cb->state) {
+    case TCP_CB_STATE_CLOSED:
+        if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_RST)) {
+            return;
+        }
+        if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_ACK)) {
+            seq = ntoh32(hdr->ack);
+            ack = 0;
+        } else {
+            seq = 0;
+            ack = ntoh32(hdr->seq);
+            if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_SYN)) {
+                ack++;
+            }
+            if (plen) {
+                ack += plen;
+            }
+            if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_FIN)) {
+                ack++;
+            }
+        }
+        tcp_tx(cb, seq, ack, TCP_FLG_RST, NULL, 0);
+        return;
+    case TCP_CB_STATE_LISTEN:
+        if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_RST)) {
+            return;
+        }
+        if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_ACK)) {
+            seq = ntoh32(hdr->ack);
+            ack = 0;
+            tcp_tx(cb, seq, ack, TCP_FLG_RST, NULL, 0);
+            return;
+        }
+        if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_SYN)) {
+            cb->rcv.nxt = ntoh32(hdr->seq) + 1;
+            cb->irx = ntoh32(hdr->seq);
+            cb->iss = (uint32_t)random();
+            seq = cb->iss;
+            ack = cb->rcv.nxt;
+            tcp_tx(cb, seq, ack, TCP_FLG_SYN | TCP_FLG_ACK, NULL, 0);
+            cb->snd.nxt = cb->iss + 1;
+            cb->snd.una = cb->iss;
+            cb->state = TCP_CB_STATE_SYN_RCVD;
+        }
+        return;
+    case TCP_CB_STATE_SYN_SENT:
+        if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_ACK)) {
+            if (ntoh32(hdr->ack) <= cb->iss || ntoh32(hdr->ack) > cb->snd.nxt) {
+                if (!TCP_FLG_ISSET(hdr->flg, TCP_FLG_RST)) {
+                    seq = ntoh32(hdr->ack);
+                    ack = 0;
+                    tcp_tx(cb, seq, ack, TCP_FLG_RST, NULL, 0);
+                }
+                return;
+            }
+        }
+        if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_RST)) {
+            if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_ACK)) {
+                // TCB close
+            }
+            return;
+        }
+        if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_SYN)) {
+            cb->rcv.nxt = ntoh32(hdr->seq) + 1;
+            cb->irs = ntoh32(hdr->seq);
+            if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_ACK)) {
+                cb->snd.una = ntoh32(hdr->ack);
+                // delete TX queue
+                if (cb->snd.una > cb->iss) {
+                    cb->state = TCP_CB_STATE_ESTABLISHED;
+                    seq = cb->snd.nxt;
+                    ack = cb->rcv.nxt;
+                    tcp_tx(cb, seq, ack, TCP_FLG_ACK, NULL, 0);
+                    pthread_cond_signal(&cb->cond);
+                }
+                return;
+            }
+            seq = cb->iss;
+            ack = cb->rcv.nxt;
+            tcp_tx(cb, seq, ack, TCP_FLG_ACK, NULL, 0);
+        }
+        return;
+    default:
+        break;
+    }
+    if (ntoh32(hdr->seq) != cb->rcv.nxt) {
+        // TODO
+        return;
+    }
+    if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_RST | TCP_FLG_SYN)) {
+        // TODO
+        return;
+    }
+    if (!TCP_FLG_ISSET(hdr->flg, TCP_FLG_ACK)) {
+        // TODO
+        return;
+    }
+    switch (cb->state) {
+    case TCP_CB_STATE_SYN_RCVD:
+        if (cb->snd.una <= ntoh32(hdr->ack) && ntoh32(hdr->ack) <= cb->snd.nxt) {
+            cb->state = TCP_CB_STATE_ESTABLISHED;
+            queue_push(&cb->parent->backlog, cb, sizeof(*cb));
+            pthread_cond_signal(&cb->parent->cond);
+        } else {
+            tcp_tx(cb, ntoh32(hdr->ack), 0, TCP_FLG_RST, NULL, 0);
+            break;
+        }
+    case TCP_CB_STATE_ESTABLISHED:
+    case TCP_CB_STATE_FIN_WAIT1:
+    case TCP_CB_STATE_FIN_WAIT2:
+    case TCP_CB_STATE_CLOSE_WAIT:
+    case TCP_CB_STATE_CLOSING:
+        if (cb->snd.una < ntoh32(hdr->ack) && ntoh32(hdr->ack) <= cb->snd.nxt) {
+            cb->snd.una = ntoh32(hdr->ack);
+        } else if (ntoh32(hdr->ack) > cb->snd.nxt) {
+            tcp_tx(cb, cb->snd.nxt, cb->rcv.nxt, TCP_FLG_ACK, NULL, 0);
+            return;
+        }
+        // send window update
+        if (cb->state == TCP_CB_STATE_FIN_WAIT1) {
+            if (ntoh32(hdr->ack) == cb->snd.nxt) {
+                cb->state = TCP_CB_STATE_FIN_WAIT2;
+            }
+        } else if (cb->state == TCP_CB_STATE_CLOSING) {
+            if (ntoh32(hdr->ack) == cb->snd.nxt) {
+                cb->state = TCP_CB_STATE_TIME_WAIT;
+                pthread_cond_signal(&cb->cond);
+            }
+            return;
+        }
+        break;
+    case TCP_CB_STATE_LAST_ATK:
+        cb->state = TCP_CB_STATE_CLOSED;
+        return;
+    }
+    if (plen) {
+        switch(cb->state) {
+        case TCP_CB_STATE_ESTABLISHED:
+        case TCP_CB_STATE_FIN_WAIT1:
+        case TCP_CB_STATE_FIN_WAIT2:
+            memcpy(cb->window + (sizeof(cb->window) - cb->rcv.wnd), (uint8_t *)hdr + hlen, plen);
+            cb->rcv.nxt = ntoh32(hdr->seq) + plen;
+            cb->rxv.wnd -= plen;
+            seq = cb->snd.nxt;
+            ack = cb->rcv.nxt;
+            tcp_tx(cb, seq, ack, TCP_FLG_ACK, NULL, 0);
+            pthread_cond_signal(&cb->cond);
+            break;
+        default:
+            break;
+        }
+    }
+    if (TCP_FLG_ISSET(hdr->flg, TCP_FLG_FIN)) {
+        cb->rcv.nxt++;
+        tcp_tx(cb, cb->snd.nxt, cb->rcv.nxt, TCP_FLG_ACK, NULL, 0);
+        switch(cb->state) {
+        case TCP_CB_STATE_SYN_RCVD:
+        case TCP_CB_STATE_ESTABLISHED:
+            cb->state = TCP_CB_STATE_CLOSE_WAIT;
+            pthread_cond_signal(&cb->cond);
+            break;
+        case TCP_CB_STATE_FIN_WAIT1:
+            cb->state = TCP_CB_STATE_FIN_WAIT2;
+            break;
+        case TCP_CB_STATE_FIN_WAIT2:
+            cb->state = TCP_CB_STATE_TIME_WAIT;
+            pthread_cond_signal(&cb->cond);
+            break;
+        default:
+            break;
+        }
+        return;
+    }
+    return;
+}
