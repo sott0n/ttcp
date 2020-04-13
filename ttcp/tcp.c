@@ -462,3 +462,19 @@ static void tcp_rx(uint8_t *segment, size_t len, ip_addr_t *src, ip_addr_t *dst,
     pthread_mutex_unlock(&mutex);
     return;
 }
+
+int tcp_api_open(void)
+{
+    struct tcp_cb *cb;
+
+    pthread_mutex_lock(&mutex);
+    for (cb = cb_table; cb < array_tailof(cb_table); cb++) {
+        if (!cb->used) {
+            cb->used = 1;
+            pthread_mutex_unlock(&mutex);
+            return array_offset(cb_table, cb);
+        }
+    }
+    pthread_mutex_unlock(&mutex);
+    return -1;
+}
