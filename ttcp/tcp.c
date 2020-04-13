@@ -478,3 +478,40 @@ int tcp_api_open(void)
     pthread_mutex_unlock(&mutex);
     return -1;
 }
+
+int tcp_api_close(int soc)
+{
+    struct tcp_cb *cb;
+
+    if (TCP_SOCKET_ISINVALID(soc)) {
+        return -1;
+    }
+    pthread_mutex_lock(&mutex);
+    cb = &cb_table[soc];
+    if (!cb->used) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    switch (cb->state) {
+    case TCP_CB_STATE_SYN_RCVD:
+    case TCP_CB_STATE_ESTABLISHED:
+        tcp_tx(cb, cb->snd.nxt, cb->rcv.nxt, TCP_FLG_FIN | TCP_FLG_ACK, NULL, 0);
+        cb->state = TCP_CB_STATE_FIN_WAIT1;
+        cb->snd.nxt++;
+        pthread_cond_wait(&cb->cond, &mutex);
+        break;
+    case TCP_CB_STATE_CLOSE_WAIT:
+        tcp_tx(cb, cb->snd.nxt, cb->rcv.nxt, TCP_FLG_FIN | TCP_FLG_ACK, NULL, 0);
+        cb->state = TCP_CB_STATE_LAST_ACK;
+        cb->snd.nxt++;
+        pthread_cond_wait(&cb->cond, &mutex);
+        break;
+    default:
+        break;
+    }
+    cb->used = 0;
+    cb->state = TCP_CB_STATE_CLOSED;
+    cb->port = 0;
+    pthread_mutex_unlock(&mutex);
+    return 0;
+}
