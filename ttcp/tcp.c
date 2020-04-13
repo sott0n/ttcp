@@ -402,3 +402,63 @@ static void tcp_incoming_event(struct tcp_cb *cb, struct tcp_hdr *hdr, size_t le
     }
     return;
 }
+
+static void tcp_rx(uint8_t *segment, size_t len, ip_addr_t *src, ip_addr_t *dst, struct netif *iface)
+{
+    struct tcp_hdr *hdr;
+    uint32_t pseudo = 0;
+    struct tcp_cb *cb, *fcb = NULL, *lcb = NULL;
+
+    if (*dst != ((struct netif *)iface)->unicast) {
+        return;
+    }
+    if (len < sizeof(struct tcp_hdr)) {
+        return;
+    }
+    hdr = (struct tcp_hdr *)segment;
+    pseudo += *src >> 16;
+    pseudo += *src & 0xffff;
+    pseudo += *dst >> 16;
+    pseudo += *dst & 0xffff;
+    pseudo += hton16((uint16_t)IP_PROTOCOL_TCP);
+    pseudo += hton16(len);
+    if (cksum16((uint16_t *)hdr, len, pseudo) != 0) {
+        fprintf(stderr, "tcp checksum error \n");
+        return;
+    }
+    pthread_mutex_lock(&mutex);
+    for (cb = cb_table; cb < array_tailof(cb_table); cb++) {
+        if (!cb->used) {
+            if (!fcb) {
+                fcb = cb;
+            }
+        }
+        else if ((!cb->iface || cb->iface == iface) && cb->port == hdr->dst) {
+            if (cb->peer.addr == *src && cb->peer.port == hdr->src) {
+                break;
+            }
+            if (cb->state == TCP_CB_STATE_LISTEN && !lcb) {
+                lcb = cb;
+            }
+        }
+    }
+    if (cb == array_tailof(cb_table)) {
+        if (!lcb || !fcb || !TCP_FLG_IS(hdr->flg, TCP_FLG_SYN)) {
+            // send RST
+            pthread_mutex_unlock(&mutex);
+            return;
+        }
+        cb = fcb;
+        cb->used = 1;
+        cb->state = lcb->state;
+        cb->iface = iface;
+        cb->port = lcb->port;
+        cb->peer.addr = *src;
+        cb->peer.port = hdr->src;
+        cb->rcv.wnd = sizeof(cb->window);
+        cb->parent = lcb;
+    }
+    tcp_incoming_event(cb, hdr, len);
+    pthread_mutex_unlock(&mutex);
+    return;
+}
