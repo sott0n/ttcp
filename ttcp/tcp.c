@@ -561,3 +561,141 @@ int tcp_api_connect(int soc, ip_addr_t *addr, uint16_t port)
     pthread_mutex_unlock(&mutex);
     return 0;
 }
+
+int tcp_api_bind(int soc, uint16_t port)
+{
+    struct tcp_cb *cb;
+
+    if (TCP_SOCKET_ISINVALID(soc)) {
+        return -1;
+    }
+    pthread_mutex_lock(&mutex);
+    for (cb = cb_table; cb < array_tailof(cb_table); cb++) {
+        if (cb->port == port) {
+            pthread_mutex_unlock(&mutex);
+            return -1;
+        }
+    }
+    cb = &cb_table[soc];
+    if (!cb->used || cb->state != TCP_CB_STATE_CLOSED) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    cb->port = port;
+    pthread_mutex_unlock(&mutex);
+    return 0;
+}
+
+int tcp_api_listen(int soc)
+{
+    struct tcp_cb *cb;
+
+    if (TCP_SOCKET_ISINVALID(soc)) {
+        return -1;
+    }
+    pthread_mutex_lock(&mutex);
+    cb = &cb_table[soc];
+    if (!cb->used || cb->state != TCP_CB_STATE_CLOSED || !cb->port) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    cb->state = TCP_CB_STATE_LISTEN;
+    pthread_mutex_unlock(&mutex);
+    return 0;
+}
+
+int tcp_api_accept(int soc)
+{
+    struct tcp_cb *cb, *backlog;
+    struct queue_entry *entry;
+
+    if (TCP_SOCKET_ISINVALID(soc)) {
+        return -1;
+    }
+    pthread_mutex_lock(&mutex);
+    cb = &cb_table[soc];
+    if (!cb->used) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    if (cb->state != TCP_CB_STATE_LISTEN) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    while ((entry = queue_pop(&cb->backlog)) == NULL) {
+        pthread_cond_wait(&cb->cond, &mutex);
+    }
+    backlog = entry->data;
+    free(entry);
+    pthread_mutex_unlock(&mutex);
+    return array_offset(cb_table, backlog);
+}
+
+ssize_t tcp_api_recv(int soc, uint8_t *buf, size_t size)
+{
+    struct tcp_cb *cb;
+    size_t total, len;
+
+    if (TCP_SOCKET_ISINVALID(soc)) {
+        return -1;
+    }
+    pthread_mutex_lock(&mutex);
+    cb = &cb_table[soc];
+    if (!cb->used) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    while (!(total = sizeof(cb->window) - cb->rcv.wnd)) {
+        if (!TCP_CB_STATE_RX_ISREADY(cb)) {
+            pthread_mutex_unlock(&mutex);
+            return 0;
+        }
+        pthread_cond_wait(&cb->cond, &mutex);
+    }
+    len = size < total ? size : total;
+    memcpy(buf, cb->window, len);
+    memmove(cb->window, cb->window + len, total - len);
+    cb->rcv.wnd += len;
+    pthread_mutex_unlock(&mutex);
+    return len;
+}
+
+ssize_t tcp_api_send(int soc, uint8_t *buf, size_t len)
+{
+    struct tcp_cb *cb;
+
+    if (TCP_SOCKET_ISINVALID(soc)) {
+        return -1;
+    }
+    pthread_mutex_lock(&mutex);
+    cb = &cb_table[soc];
+    if (!cb->used) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    if (!TCP_CB_STATE_TX_ISREADY(cb)) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    tcp_tx(cb, cb->snd.nxt, cb->rcv.nxt, TCP_FLG_ACK | TCP_FLG_PSH, buf, len);
+    cb->snd.nxt += len;
+    pthread_mutex_unlock(&mutex);
+    return 0;
+}
+
+int tcp_init(void)
+{
+    struct tcp_cb *cb;
+
+    for (cb = cb_table; cb < array_tailof(cb_table); cb++) {
+        pthread_cond_init(&cb->cond, NULL);
+    }
+    pthread_mutex_init(&mutex, NULL);
+    if (ip_add_protocol(IP_PROTOCOL_TCP, tcp_rx) == -1) {
+        return -1;
+    }
+    if (pthread_create(&timer_thread, NULL, tcp_timer_thread, NULL) == -1) {
+        return -1;
+    }
+    return 0;
+}
