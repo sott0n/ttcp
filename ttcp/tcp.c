@@ -515,3 +515,49 @@ int tcp_api_close(int soc)
     pthread_mutex_unlock(&mutex);
     return 0;
 }
+
+int tcp_api_connect(int soc, ip_addr_t *addr, uint16_t port)
+{
+    struct tcp_cb *cb, *tmp;
+    uint32_t p;
+
+    if (TCP_SOCKET_ISINVALID(soc)) {
+        return -1;
+    }
+    pthread_mutex_lock(&mutex);
+    cb = &cb_table[soc];
+    if (!cb->used || cb->state != TCP_CB_STATE_CLOSED) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    if (!cb->port) {
+        int offset = time(NULL) % 1024;
+        for (p = TCP_SOURCE_PORT_MIN + offset; p <= TCP_SOURCE_PORT_MAX; p++) {
+            for (tmp = cb_table; tmp < array_tailof(cb_table); tmp++) {
+                if (tmp->used && tmp->port == hton16((uint16_t)p)) {
+                    break;
+                }
+            }
+            if (tmp == array_tailof(cb_table)) {
+                cb->port = hton16((uint16_t)p);
+                break;
+            }
+        }
+        if ((!cb->port)) {
+            pthread_mutex_unlock(&mutex);
+            return -1;
+        }
+    }
+    cb->peer.addr = *addr;
+    cb->peer.port = port;
+    cb->rcv.wnd = sizeof(cb->window);
+    cb->iss = (uint32_t)random();
+    tcp_tx(cb, cb->iss, 0, TCP_FLG_SYN, NULL, 0);
+    cb->snd.nxt = cb->iss + 1;
+    cb->state = TCP_CB_STATE_SYN_SENT;
+    while (cb->state == TCP_CB_STATE_SYN_SENT) {
+        pthread_cond_wait(&cb_table[soc].cond, &mutex);
+    }
+    pthread_mutex_unlock(&mutex);
+    return 0;
+}
