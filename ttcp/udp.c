@@ -120,7 +120,7 @@ static void udp_rx(uint8_t *buf, size_t len, ip_addr_t *src, ip_addr_t *dst, str
             queue_hdr->addr = *src;
             queue_hdr->port = hdr->sport;
             queue_hdr->len = len - sizeof(struct udp_hdr);
-            memcpy(queue_hdr + 1, hdr + 1, len - sizeof(struct  udp_hdr));
+            memcpy(queue_hdr + 1, hdr + 1, len - sizeof(struct udp_hdr));
             queue_push(&cb->queue, data, sizeof(struct udp_queue_hdr) + (len - sizeof(struct udp_hdr)))
             pthread_cond_broadcast(&cb->cond);
             pthread_mutex_unlock(&mutex);
@@ -128,4 +128,79 @@ static void udp_rx(uint8_t *buf, size_t len, ip_addr_t *src, ip_addr_t *dst, str
         }
     }
     pthread_mutex_unlock(&mutex);
+}
+
+int udp_api_open(void)
+{
+    struct udp_cb *cb;
+
+    pthread_mutex_lock(&mutex);
+    for (cb = cb_table; cb < array_tailof(cb_table); cb++) {
+        if (!cb->used) {
+            cb->used = 1;
+            pthread_mutex_unlock(&mutex);
+            return array_offset(cb_table, cb);
+        }
+    }
+    pthread_mutex_unlock(&mutex);
+    return -1;
+}
+
+int udp_api_close(int soc)
+{
+    struct udp_cb *cb;
+    struct queue_entry *entry;
+
+    if (soc < 0 || soc >= UDP_CB_TABLE_SIZE) {
+        return -1;
+    }
+    pthread_mutex_lock(&mutex);
+    cb = &cb_table[soc];
+    if (!cb->used) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    cb->used = 0;
+    cb->iface = NULL;
+    cb->port = 0;
+    while ((entry = queue_pop(&cb->queue)) != NULL) {
+        free(entry->data);
+        free(entry);
+    }
+    cb->queue.next = cb->queue.tail = NULL;
+    pthread_mutex_unlock(&mutex);
+    return 0;
+}
+
+int udp_api_bind(int soc, ip_addr_t *addr, uint16_t port)
+{
+    struct udp_cb *cb, *tmp;
+    struct netif *iface = NULL;
+
+    if (soc < 0 || soc >= UDP_CB_TABLE_SIZE) {
+        return -1;
+    }
+    pthread_mutex_lock(&mutex);
+    cb = &cb_table[soc];
+    if (!cb->used) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    if (addr && *addr) {
+        iface = ip_netif_by_addr(addr);
+        if (!iface) {
+            pthread_mutex_unlock(&mutex);
+            return -1;
+        }
+    }
+    for (tmp = cb_table; tmp < array_tailof(cb_table); tmp++) {
+        if (tmp->used && tmp != cb && (!iface || !tmp->iface || tmp->iface == iface) && tmp->port == port) {
+            pthread_mutex_unlock(&mutex);
+            return -1;
+        }
+    }
+    cb->iface = iface;
+    cb->port = port;
+    pthread_mutex_unlock(&mutex);
+    return 0;
 }
