@@ -204,3 +204,28 @@ int udp_api_bind(int soc, ip_addr_t *addr, uint16_t port)
     pthread_mutex_unlock(&mutex);
     return 0;
 }
+
+int udp_api_bind_iface(int soc, struct netif *iface, uint16_t port)
+{
+    struct udp_cb *cb, *tmp;
+
+    if (soc < 0 || soc >= UDP_CB_TABLE_SIZE) {
+        return -1;
+    }
+    pthread_mutex_lock(&mutex);
+    cb = &cb_table[soc];
+    if (!cb->used) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    for (tmp = cb_table; tmp < array_tailof(cb_table); tmp++) {
+        if (tmp->used && tmp != cb && (!iface || !tmp->iface || tmp->iface == iface) && tmp->port == port) {
+            pthread_mutex_unlock(&mutex);
+            return -1;
+        }
+    }
+    cb->iface = iface;
+    cb->port = port;
+    pthread_mutex_unlock(&mutex);
+    return 0;
+}
