@@ -229,3 +229,50 @@ int udp_api_bind_iface(int soc, struct netif *iface, uint16_t port)
     pthread_mutex_unlock(&mutex);
     return 0;
 }
+
+ssize_t udp_api_recvfrom(int soc, uint8_t *buf, size_t size, ip_addr_t *peer, uint16_t *port, int timeout)
+{
+    struct udp_cb *cb;
+    struct queue_entry *entry;
+    struct timeval tv;
+    struct timespec ts;
+    int ret = 0;
+    ssize_t len;
+    struct udp_queue_hdr *queue_hdr;
+
+    if (soc < 0 || soc >= UDP_CB_TABLE_SIZE) {
+        return -1;
+    }
+    pthread_mutex_lock(&mutex);
+    cb = &cb_table[soc];
+    if (!cb->used) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    gettimeofday(&tv, NULL);
+    while ((entry = queue_pop(&cb->queue)) == NULL && ret != ETIMEDOUT) {
+        if (timeout != -1) {
+            ts.tv_sec = tv.tv_sec + timeout;
+            ts.tv_nsec = tv.tv_usec * 1000;
+            ret = pthread_cond_timedwait(&cb->cond, &mutex, &ts);
+        } else {
+            ret = pthread_cond_wait(&cb->cond, &mutex);
+        }
+    }
+    pthread_mutex_unlock(&mutex);
+    if (ret == ETIMEDOUT) {
+        return -1;
+    }
+    queue_hdr = (struct udp_queue_hdr *)entry->data;
+    if (peer) {
+        *peer = queue_hdr->addr;
+    }
+    if (port) {
+        *port = queue_hdr->port;
+    }
+    len = MIN(size, queue_hdr->len);
+    memcpy(buf, queue_hdr + 1, len);
+    free(entry->data);
+    free(entry);
+    return len;
+}
