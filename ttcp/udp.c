@@ -276,3 +276,63 @@ ssize_t udp_api_recvfrom(int soc, uint8_t *buf, size_t size, ip_addr_t *peer, ui
     free(entry);
     return len;
 }
+
+ssize_t udp_api_sendto(int soc, uint8_t *buf, size_t len, ip_addr_t *peer, uint16_t port)
+{
+    struct udp_cb *cb, *tmp;
+    struct netif *iface;
+    uint32_t p;
+    uint16_t sport;
+
+    if (soc < 0 || soc >= UDP_CB_TABLE_SIZE) {
+        return -1;
+    }
+    pthread_mutex_lock(&mutex);
+    cb = &cb_table[soc];
+    if (!cb->used) {
+        pthread_mutex_unlock(&mutex);
+        return -1;
+    }
+    iface = cb->iface;
+    if (!iface) {
+        iface = ip_netif_by_peer(peer);
+        if (!iface) {
+            pthread_mutex_unlock(&mutex);
+            return -1;
+        }
+    }
+    if (!cb->port) {
+        for (p = UDP_SOURCE_PORT_MIN; p <= UDP_SOURCE_PORT_MAX; p++) {
+            for (tmp = cb_table; tmp < array_tailof(cb_table); tmp++) {
+                if (tmp->port == hton16((uint16_t)p) && (!tmp->iface || tmp->iface == iface)) {
+                    break;
+                }
+            }
+            if (tmp == array_tailof(cb_table)) {
+                cb->port = hton16((uint16_t)p);
+                break;
+            }
+        }
+        if (!cb->port) {
+            pthread_mutex_unlock(&mutex);
+            return -1;
+        }
+    }
+    sport = cb->port;
+    pthread_mutex_unlock(&mutex);
+    return udp_tx(iface, sport, buf, len, peer, port);
+}
+
+int udp_init(void)
+{
+    struct udp_cb *cb;
+
+    for (cb = cb_table; cb < array_tailof(cb_table); cb++) {
+        pthread_cond_init(&cb->cond, NULL);
+    }
+    pthread_mutex_init(&mutex, NULL);
+    if (ip_add_protocol(IP_PROTOCOL_UDP, udp_rx) == -1) {
+        return -1;
+    }
+    return 0;
+}
